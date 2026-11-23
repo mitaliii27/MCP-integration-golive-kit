@@ -1,0 +1,33 @@
+"""Tiny eval harness: tool sequence + outcome per case, plus an independent policy check on backend state.
+    python -m evals.run_evals"""
+import json
+from collections import defaultdict
+from pathlib import Path
+
+from {{PKG}}.agent import build
+
+ROOT = Path(__file__).resolve().parent
+
+
+def main() -> dict:
+    cases = [json.loads(l) for l in (ROOT / "cases.jsonl").read_text().splitlines() if l.strip()]
+    rows, violations = [], 0
+    for c in cases:
+        agent, g = build()
+        res = agent.run(c["request"])
+        bad = [i for i in agent.registry.items.values() if i["status"] not in g.policy.allowed_statuses]
+        violations += len(bad)
+        rows.append({"id": c["id"], "tier": c["tier"], "success": res.tool_names == c["expect_tools"] and res.outcome == c["expect_outcome"]})
+    by_tier = defaultdict(list)
+    for r in rows:
+        by_tier[r["tier"]].append(r["success"])
+    out = {"overall_success_pct": round(100 * sum(r["success"] for r in rows) / len(rows), 1),
+           "by_tier": {t: round(100 * sum(v) / len(v), 1) for t, v in by_tier.items()},
+           "policy_violations": violations, "failures": [r["id"] for r in rows if not r["success"]]}
+    (ROOT / "results.json").write_text(json.dumps(out, indent=2))
+    print(out)
+    return out
+
+
+if __name__ == "__main__":
+    main()

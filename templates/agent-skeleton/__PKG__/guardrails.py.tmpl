@@ -1,0 +1,38 @@
+"""Policy lives BELOW the planner: whatever the model proposes, this decides what executes."""
+import json
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+
+ALLOWED, DENIED = "allowed", "denied"
+
+
+@dataclass
+class Policy:
+    allowed_statuses: tuple[str, ...] = ("open", "in_progress", "closed")
+    max_writes_per_run: int = 2
+    write_tools: tuple[str, ...] = ("update_item_status",)
+
+
+@dataclass
+class Guardrails:
+    policy: Policy = field(default_factory=Policy)
+    audit_path: Path | None = None
+    writes: int = 0
+
+    def reset_run(self) -> None:
+        self.writes = 0
+
+    def check(self, tool: str, args: dict) -> tuple[str, str]:
+        if tool in self.policy.write_tools:
+            if self.writes >= self.policy.max_writes_per_run:
+                return DENIED, "write limit reached"
+            if args.get("status") not in self.policy.allowed_statuses:
+                return DENIED, f"status {args.get('status')!r} is not allowed"
+        return ALLOWED, ""
+
+    def audit(self, event: dict) -> None:
+        if self.audit_path:
+            self.audit_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.audit_path.open("a") as fh:
+                fh.write(json.dumps({"ts": time.time(), **event}, default=str) + "\n")

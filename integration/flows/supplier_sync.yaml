@@ -1,0 +1,15 @@
+# Supplier master updates -> S/4-style target (second flow: same engine, different config).
+name: supplier_sync
+idempotency_key: "$.supplier_id"
+retry: {max_attempts: 3, backoff_s: 1.0, factor: 3.0, max_backoff_s: 10.0}
+steps:
+  - type: validate
+    required: ["$.supplier_id", "$.name", "$.bank.iban"]
+  - type: map
+    mapping:
+      Supplier: {path: "$.supplier_id", transform: upper}
+      SupplierName: "$.name"
+      BankAccount: {path: "$.bank.iban", transform: upper}
+      Country: {path: "$.country", default: DE}
+  - type: deliver
+    target: s4_suppliers

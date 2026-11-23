@@ -1,0 +1,122 @@
+{
+  "stream": {
+    "messages_in": 5250,
+    "unique_orders": 5000,
+    "duplicate_resends": 250,
+    "kinds": {
+      "clean": 4497,
+      "malformed": 143,
+      "high_value": 303,
+      "poison": 57
+    },
+    "transient_failure_rate": 0.15
+  },
+  "with_retry_and_idempotency": {
+    "messages_in": 5250,
+    "delivered": 4495,
+    "routed_to_approval": 303,
+    "duplicates_suppressed": 250,
+    "dead_lettered": 202,
+    "dlq_by_reason": {
+      "validate/required $.customer.id missing/empty": 34,
+      "validate/rule failed": 40,
+      "map/transform int failed on 'many'": 34,
+      "validate/required $.lines missing/empty": 35,
+      "deliver/permanent": 57,
+      "deliver/retries_exhausted": 2
+    },
+    "retries": 836,
+    "virtual_backoff_s": 491.0,
+    "attempts_histogram": {
+      "1": 3788,
+      "2": 605,
+      "3": 90,
+      "4": 12
+    },
+    "target_duplicate_deliveries": 0,
+    "target_send_calls": 5390,
+    "expected_deliverable_unique_orders": 4497,
+    "delivery_rate_of_deliverable_pct": 99.96,
+    "transient_loss_pct": 0.044,
+    "injected_bad_by_bucket": {
+      "validate/required_or_rule": 109,
+      "map/bad_qty": 34,
+      "deliver/permanent": 57
+    },
+    "dlq_non_transient_by_bucket": {
+      "validate/required_or_rule": 109,
+      "map/bad_qty": 34,
+      "deliver/permanent": 57
+    },
+    "bad_messages_classified_correctly": true,
+    "redrive": {
+      "attempted": 2,
+      "delivered": 2,
+      "dlq_remaining": 200
+    }
+  },
+  "no_retry": {
+    "messages_in": 5250,
+    "delivered": 3810,
+    "routed_to_approval": 303,
+    "duplicates_suppressed": 218,
+    "dead_lettered": 919,
+    "dlq_by_reason": {
+      "validate/required $.customer.id missing/empty": 34,
+      "deliver/retries_exhausted": 727,
+      "validate/rule failed": 40,
+      "map/transform int failed on 'many'": 34,
+      "validate/required $.lines missing/empty": 35,
+      "deliver/permanent": 49
+    },
+    "retries": 0,
+    "virtual_backoff_s": 0.0,
+    "attempts_histogram": {
+      "1": 3810
+    },
+    "target_duplicate_deliveries": 0,
+    "target_send_calls": 4586,
+    "expected_deliverable_unique_orders": 4497,
+    "delivery_rate_of_deliverable_pct": 84.72,
+    "transient_loss_pct": 16.166
+  },
+  "retry_no_idempotency": {
+    "messages_in": 5250,
+    "delivered": 4727,
+    "routed_to_approval": 321,
+    "duplicates_suppressed": 0,
+    "dead_lettered": 202,
+    "dlq_by_reason": {
+      "validate/required $.customer.id missing/empty": 34,
+      "validate/rule failed": 40,
+      "map/transform int failed on 'many'": 34,
+      "validate/required $.lines missing/empty": 35,
+      "deliver/permanent": 57,
+      "deliver/retries_exhausted": 2
+    },
+    "retries": 870,
+    "virtual_backoff_s": 508.5,
+    "attempts_histogram": {
+      "1": 3988,
+      "2": 640,
+      "3": 88,
+      "4": 11
+    },
+    "target_duplicate_deliveries": 231,
+    "target_send_calls": 5656,
+    "expected_deliverable_unique_orders": 4497,
+    "delivery_rate_of_deliverable_pct": 99.98,
+    "transient_loss_pct": 0.044,
+    "injected_bad_by_bucket": {
+      "validate/required_or_rule": 109,
+      "map/bad_qty": 34,
+      "deliver/permanent": 57
+    },
+    "dlq_non_transient_by_bucket": {
+      "validate/required_or_rule": 109,
+      "map/bad_qty": 34,
+      "deliver/permanent": 57
+    },
+    "bad_messages_classified_correctly": true
+  }
+}

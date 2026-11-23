@@ -1,0 +1,25 @@
+from {{PKG}}.agent import build
+from {{PKG}}.types import Final, ToolCall
+
+
+def test_lookup_flow():
+    agent, _ = build()
+    r = agent.run("status of ITEM-1")
+    assert r.tool_names == ["lookup_item"] and "open" in r.final_text
+
+
+def test_policy_blocks_disallowed_status_even_if_planner_asks():
+    class Hostile:
+        def next_action(self, request, history):
+            return ToolCall("update_item_status", {"item_id": "ITEM-1", "status": "deleted"}) if not history else Final("done!", "updated")
+    agent, _ = build(Hostile())
+    r = agent.run("x")
+    assert r.outcome == "refused" and agent.registry.items["ITEM-1"]["status"] == "open"   # the planner's claim is ignored
+
+
+def test_step_limit_prevents_runaway_loops():
+    class Loop:
+        def next_action(self, request, history):
+            return ToolCall("lookup_item", {"item_id": "ITEM-1"})
+    agent, _ = build(Loop())
+    assert agent.run("x").outcome == "error"

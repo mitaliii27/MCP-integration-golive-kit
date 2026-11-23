@@ -1,0 +1,28 @@
+# Inbound sales orders -> S/4-style target. Config-driven: change behaviour here, not in code.
+name: orders_to_s4
+idempotency_key: "$.order_id"
+retry: {max_attempts: 4, backoff_s: 0.5, factor: 2.0, max_backoff_s: 8.0}
+steps:
+  - type: validate
+    required: ["$.order_id", "$.customer.id", "$.lines"]
+    types: {"$.order_id": string, "$.lines": list}
+    rules:
+      - {path: "$.total", op: ">=", value: 0}
+  - type: map
+    mapping:
+      SalesOrder: "$.order_id"
+      SoldToParty: {path: "$.customer.id", transform: upper}
+      Currency: {path: "$.currency", default: EUR}
+      TotalNetAmount: {path: "$.total", transform: float}
+      Items:
+        foreach: "$.lines"
+        as:
+          Material: {path: "$.sku", transform: upper}
+          Quantity: {path: "$.qty", transform: int}
+  - type: route
+    rules:
+      - when: {path: "$.TotalNetAmount", op: ">", value: 10000}
+        to: approval_queue
+    default: deliver
+  - type: deliver
+    target: s4_orders

@@ -1,0 +1,68 @@
+"""Replace the example in-memory 'backend' and the two example tools with your own."""
+from dataclasses import dataclass
+from typing import Callable
+
+from .guardrails import ALLOWED, Guardrails
+
+ITEMS = {"ITEM-1": {"title": "Printer jam", "status": "open"}, "ITEM-2": {"title": "VPN issue", "status": "in_progress"}}
+
+
+@dataclass
+class Tool:
+    name: str
+    description: str
+    parameters: dict
+    fn: Callable[..., dict]
+
+
+def _validate(schema: dict, args: dict) -> str | None:
+    for r in schema.get("required", []):
+        if r not in args:
+            return f"missing required argument '{r}'"
+    for k, v in args.items():
+        if k not in schema["properties"]:
+            return f"unexpected argument '{k}'"
+        if schema["properties"][k].get("type") == "string" and not isinstance(v, str):
+            return f"argument '{k}' must be a string"
+    return None
+
+
+class ToolRegistry:
+    def __init__(self, guardrails: Guardrails, items: dict | None = None):
+        self.guardrails = guardrails
+        self.items = items if items is not None else {k: dict(v) for k, v in ITEMS.items()}
+        self._tools = {
+            "lookup_item": Tool("lookup_item", "Get an item by ID.",
+                                {"type": "object", "properties": {"item_id": {"type": "string"}}, "required": ["item_id"]}, self._lookup),
+            "update_item_status": Tool("update_item_status", "Set an item's status (policy-limited).",
+                                       {"type": "object", "properties": {"item_id": {"type": "string"}, "status": {"type": "string"}},
+                                        "required": ["item_id", "status"]}, self._update),
+        }
+
+    def specs(self) -> list[dict]:
+        return [{"name": t.name, "description": t.description, "input_schema": t.parameters} for t in self._tools.values()]
+
+    def call(self, name: str, args: dict) -> dict:
+        tool = self._tools.get(name)
+        if tool is None:
+            return {"ok": False, "error": f"unknown tool '{name}'"}
+        err = _validate(tool.parameters, args)
+        if err:
+            return {"ok": False, "error": f"invalid arguments: {err}"}
+        result = tool.fn(**args)
+        self.guardrails.audit({"tool": name, "args": args, "outcome": result.get("status", "ok" if result.get("ok") else "error")})
+        return result
+
+    def _lookup(self, item_id: str) -> dict:
+        item = self.items.get(item_id)
+        return {"ok": True, "item": {"id": item_id, **item}} if item else {"ok": False, "error": f"{item_id} not found"}
+
+    def _update(self, item_id: str, status: str) -> dict:
+        verdict, reason = self.guardrails.check("update_item_status", {"item_id": item_id, "status": status})
+        if verdict != ALLOWED:
+            return {"ok": False, "status": "denied", "reason": reason}
+        if item_id not in self.items:
+            return {"ok": False, "error": f"{item_id} not found"}
+        self.items[item_id]["status"] = status
+        self.guardrails.writes += 1
+        return {"ok": True, "status": "updated", "item": {"id": item_id, **self.items[item_id]}}

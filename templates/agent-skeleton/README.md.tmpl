@@ -1,0 +1,12 @@
+# {{PROJECT_NAME}}
+
+Agent project skeleton: tool registry with schema validation, guardrails below the planner, an agent loop with a step cap and tool-derived outcomes, an eval harness with an independent policy check, tests and CI.
+
+```bash
+pip install -r requirements.txt
+make test eval
+```
+
+**Note:** the starter `ScriptedPlanner` intentionally fails the paraphrase case `p1` in `evals/cases.jsonl` - that failing case is the headroom a real planner should close. Policy violations must stay at 0.
+
+**Next steps:** replace the example tools/backend in `{{PKG}}/tools.py`, write your real policy in `{{PKG}}/guardrails.py`, add eval cases from real scenarios (direct / paraphrased / adversarial), then swap `ScriptedPlanner` for a tool-calling LLM planner and compare tiers on the same eval set.

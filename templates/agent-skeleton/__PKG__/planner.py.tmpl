@@ -1,0 +1,24 @@
+"""ScriptedPlanner: deterministic stand-in for an LLM so plumbing and evals run offline.
+Replace with a tool-calling LLM planner implementing the same `next_action` interface, then
+re-run the SAME evals to see how much headroom the model recovers."""
+import re
+
+from .types import Final, ToolCall
+
+
+class ScriptedPlanner:
+    def next_action(self, request: str, history: list[dict]):
+        item = re.search(r"\bITEM-\d+\b", request, re.I)
+        setm = re.search(r"\b(?:set|mark|move)\b.*\bto\s+(\w+)", request, re.I)
+        if not item:
+            return Final("Which item do you mean? Please give an ID like ITEM-1.", "clarify")
+        item_id = item.group(0).upper()
+        if setm:
+            if not history:
+                return ToolCall("update_item_status", {"item_id": item_id, "status": setm.group(1).lower()})
+            r = history[-1]["result"]
+            return Final("Updated." if r.get("ok") else f"Could not update: {r.get('reason') or r.get('error')}", "answered")
+        if not history:
+            return ToolCall("lookup_item", {"item_id": item_id})
+        r = history[-1]["result"]
+        return Final(f"{item_id}: {r['item']['title']} is {r['item']['status']}." if r.get("ok") else r["error"], "answered" if r.get("ok") else "not_found")

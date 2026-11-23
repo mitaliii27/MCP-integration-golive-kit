@@ -1,0 +1,35 @@
+from .guardrails import Guardrails
+from .tools import ToolRegistry
+from .types import Final, Planner, RunResult, ToolCall
+
+
+def derive_outcome(steps: list[dict], final: Final) -> str:
+    """Outcome comes from what the tools did, not from what the planner claims."""
+    writes = [s for s in steps if s["tool"] == "update_item_status"]
+    if any(s["result"].get("status") == "updated" for s in writes):
+        return "updated"
+    if any(s["result"].get("status") == "denied" for s in writes):
+        return "refused"
+    return final.outcome_hint
+
+
+class Agent:
+    def __init__(self, planner: Planner, registry: ToolRegistry, guardrails: Guardrails, max_steps: int = 6):
+        self.planner, self.registry, self.guardrails, self.max_steps = planner, registry, guardrails, max_steps
+
+    def run(self, request: str) -> RunResult:
+        self.guardrails.reset_run()
+        steps: list[dict] = []
+        for _ in range(self.max_steps):
+            action = self.planner.next_action(request, steps)
+            if isinstance(action, Final):
+                return RunResult(request, action.text, derive_outcome(steps, action), steps)
+            steps.append({"tool": action.name, "args": action.args, "result": self.registry.call(action.name, action.args)})
+        stopped = Final("Stopped: step limit reached.", "error")
+        return RunResult(request, stopped.text, derive_outcome(steps, stopped), steps)
+
+
+def build(planner=None):
+    from .planner import ScriptedPlanner
+    g = Guardrails()
+    return Agent(planner or ScriptedPlanner(), ToolRegistry(g), g), g
